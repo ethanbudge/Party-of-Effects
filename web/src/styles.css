@@ -747,7 +747,9 @@ input[type='color'] {
   flex-direction: column;
   gap: 10px;
   z-index: 39;
-  max-width: 330px;
+  /* Wide enough that a track title, artist and album each get a readable
+     line before truncating. */
+  max-width: 384px;
 }
 
 .dock-card {
@@ -761,10 +763,27 @@ input[type='color'] {
   min-height: 58px;
 }
 
+.dock-card .dock-main {
+  padding-block: 7px;
+}
+
 .dock-swatch {
   width: 58px;
   flex-shrink: 0;
   position: relative;
+}
+
+/* When album art sits beside it, the scene colour becomes a slim edge. */
+.dock-swatch.narrow {
+  width: 12px;
+}
+
+.dock-art {
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
 }
 
 .dock-main {
@@ -787,10 +806,15 @@ input[type='color'] {
 
 .dock-sub {
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.35;
+}
+
+.dock-sub.faint {
+  color: var(--text-faint);
 }
 
 .dock-controls {
