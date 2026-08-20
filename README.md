@@ -197,6 +197,39 @@ and a white-temperature strip, matching how the LIFX app presents colour. That
 separation is deliberate: on a bulb, saturation and brightness are independent
 controls, and a browser's default square picker conflates them.
 
+### Voice triggers
+
+Optional, off by default, and set up entirely in Settings: pick a language,
+download its model, flip the switch. After that, saying an effect's trigger
+phrase fires it for the whole party exactly as clicking the tile would.
+
+- **Recognition runs on your machine only.** The match is turned into the same
+  broadcast a click sends, so recognition latency lands once, on the person
+  speaking, and never enters anyone else's sound/light sync. Nobody else needs
+  voice enabled.
+- **On-device by default.** Chrome can run recognition locally
+  (`processLocally: true`), so audio and transcripts never leave the machine and
+  it works offline. If a language has no local model, listening stays blocked
+  until you explicitly tick "allow cloud recognition".
+- **Nothing is stored.** A transcript is a string in memory for a few
+  milliseconds, compared against your trigger words, then dropped. No history,
+  no database rows, no disk. The only thing that takes space is the browser's
+  own language pack, which the browser manages.
+- **Trigger phrases are per effect**, edited as chips in the effect editor and
+  shared with the group. Matching folds accents and case, so a cue typed
+  `Décharge` still fires when the recogniser hears `decharge`, and requires
+  whole words, so "ice" cannot fire inside "nice".
+- **Your own speakers can't trigger you.** The microphone is ignored while an
+  effect is playing.
+
+The seeded dndlights effects arrive with their original French cues already
+attached — 31 of the 43. Those cues were chosen to be phonetically distinct
+from English table talk, which matters more here than it did in dndlights:
+the Web Speech API transcribes everything and the app matches against the text,
+so false positives are the failure mode worth designing against.
+
+Requires Chrome, Edge, or Safari. Firefox never shipped the API.
+
 ### Per-person settings
 
 Two settings under your name in the top bar exist so people with different rooms

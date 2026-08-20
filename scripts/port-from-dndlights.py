@@ -71,10 +71,29 @@ call_re = re.compile(
 )
 revert_re = re.compile(r"revert_state\(\s*duration\s*=\s*([0-9.]+)\s*\)")
 sound_re = re.compile(r'\.get_sound_path\(\s*"([^"]+)"')
+# dndlights recorded its voice cues as a comment above each function:
+#   #  Voice command (French): "Boule de feu"
+voice_re = re.compile(r'Voice command \([^)]*\):\s*"([^"]+)"')
 
 effects = []
 for src_name in ("spells.R", "effects.R"):
     body = (R / src_name).read_text()
+
+    # Voice cues live in the comment block *above* the function, so pair each
+    # cue with the next function defined after it.
+    cues = {}
+    pending = None
+    for line in body.splitlines():
+        m = voice_re.search(line)
+        if m:
+            pending = m.group(1)
+            continue
+        fm = re.match(r'^([a-z_0-9]+)\s*<-\s*function\(\)', line)
+        if fm:
+            if pending:
+                cues[fm.group(1)] = pending
+            pending = None
+
     for fname, fbody in fn_re.findall(body):
         calls = call_re.findall(fbody)
         if not calls:
@@ -106,6 +125,7 @@ for src_name in ("spells.R", "effects.R"):
                 "duration_ms": round(t * 1000),
                 "revert_ms": round(float(rev.group(1)) * 1000) if rev else 2000,
                 "sound": snd.group(1) if snd else None,
+                "triggers": [cues[fname]] if fname in cues else [],
                 "source": src_name,
             }
         )
@@ -254,10 +274,16 @@ out.append(
 
 for e in effects:
     frames_json = json.dumps(e["frames"], separators=(",", ":"))
+    triggers_sql = (
+        "array[" + ",".join(q(t) for t in e["triggers"]) + "]::text[]"
+        if e["triggers"]
+        else "'{}'::text[]"
+    )
+    cue = f", voice: {e['triggers'][0]}" if e["triggers"] else ""
     out.append(
-        f"""-- {title(e['name'])} — {len(e['frames'])} frames, {e['duration_ms']}ms, sound: {e['sound'] or 'n/a'}
-insert into public.effects (name, sound_path, duration_ms, frames, revert_ms)
-select {q(title(e['name']))}, null, {e['duration_ms']}, {q(frames_json)}::jsonb, {e['revert_ms']}
+        f"""-- {title(e['name'])} — {len(e['frames'])} frames, {e['duration_ms']}ms, sound: {e['sound'] or 'n/a'}{cue}
+insert into public.effects (name, sound_path, duration_ms, frames, revert_ms, trigger_words)
+select {q(title(e['name']))}, null, {e['duration_ms']}, {q(frames_json)}::jsonb, {e['revert_ms']}, {triggers_sql}
 where not exists (select 1 from public.effects where name = {q(title(e['name']))});"""
     )
 
@@ -330,6 +356,7 @@ print(f"effects: {len(effects)}  (spells: "
       f"non-spell: {sum(1 for e in effects if e['source'] == 'effects.R')})")
 print(f"frames:  {sum(len(e['frames']) for e in effects)} total")
 print(f"scenes with playlists: {sum(1 for s in scenes if s['playlist'])}/{len(scenes)}")
+print(f"effects with a voice cue: {sum(1 for e in effects if e['triggers'])}/{len(effects)}")
 if uncovered_s:
     print(f"scenes in no folder: {sorted(uncovered_s)}")
 if uncovered_e:

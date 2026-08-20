@@ -103,6 +103,14 @@ create table if not exists public.user_settings (
   user_id        uuid primary key references auth.users(id) on delete cascade,
   max_brightness real not null default 1 check (max_brightness >= 0 and max_brightness <= 1),
   light_ids      text[],
+  -- Voice triggering. Off by default: it needs microphone permission, so it
+  -- is never something you get without asking for it.
+  voice_enabled  boolean not null default false,
+  voice_language text not null default 'en-US',
+  -- Whether this person will accept cloud speech recognition when their
+  -- browser has no on-device model. Off by default, so audio stays local
+  -- unless they explicitly opt in.
+  voice_allow_cloud boolean not null default false,
   updated_at     timestamptz not null default now()
 );
 
@@ -162,9 +170,31 @@ create table if not exists public.effects (
   duration_ms   integer not null default 0,
   frames        jsonb not null default '[]'::jsonb,
   revert_ms     integer not null default 2000,  -- fade back to active scene
+  -- Spoken phrases that fire this effect, for anyone with voice enabled.
+  -- Shared across the group, like the rest of the effect.
+  trigger_words text[] not null default '{}',
   created_by    uuid references auth.users(id) on delete set null,
   created_at    timestamptz not null default now()
 );
+
+
+-- ---------------------------------------------------------------------------
+-- Upgrades for databases created before a column existed
+-- ---------------------------------------------------------------------------
+-- `create table if not exists` above does nothing when the table is already
+-- there, so new columns need adding explicitly. These are no-ops on a fresh
+-- database and on a re-run.
+alter table public.effects
+  add column if not exists trigger_words text[] not null default '{}';
+
+alter table public.user_settings
+  add column if not exists voice_enabled boolean not null default false;
+
+alter table public.user_settings
+  add column if not exists voice_language text not null default 'en-US';
+
+alter table public.user_settings
+  add column if not exists voice_allow_cloud boolean not null default false;
 
 alter table public.effects enable row level security;
 

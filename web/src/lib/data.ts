@@ -24,7 +24,16 @@ export async function getSettings(userId: string): Promise<UserSettings> {
     .maybeSingle();
 
   if (error) throw error;
-  return (data as UserSettings) ?? { user_id: userId, max_brightness: 1, light_ids: null };
+  return (
+    (data as UserSettings) ?? {
+      user_id: userId,
+      max_brightness: 1,
+      light_ids: null,
+      voice_enabled: false,
+      voice_language: 'en-US',
+      voice_allow_cloud: false,
+    }
+  );
 }
 
 export async function saveSettings(
@@ -85,7 +94,11 @@ export async function deleteScene(id: string): Promise<void> {
 export async function listEffects(): Promise<Effect[]> {
   const { data, error } = await supabase.from('effects').select('*').order('name');
   if (error) throw error;
-  return (data as Effect[]).map((e) => ({ ...e, frames: (e.frames ?? []) as Frame[] }));
+  return (data as Effect[]).map((e) => ({
+    ...e,
+    frames: (e.frames ?? []) as Frame[],
+    trigger_words: e.trigger_words ?? [],
+  }));
 }
 
 export async function createEffect(input: {
@@ -94,6 +107,7 @@ export async function createEffect(input: {
   duration_ms: number;
   frames: Frame[];
   revert_ms: number;
+  trigger_words: string[];
   created_by: string;
 }): Promise<Effect> {
   const { data, error } = await supabase.from('effects').insert(input).select().single();

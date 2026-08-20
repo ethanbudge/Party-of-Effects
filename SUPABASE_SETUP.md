@@ -24,7 +24,9 @@ You should see "Success. No rows returned." This creates every table, all the
 Row Level Security policies, the storage bucket for sound files, and the trigger
 that gives each new user a profile.
 
-The file is safe to re-run if you ever need to.
+The file is safe to re-run, and you should re-run it after pulling changes: it
+adds any new columns to tables you already have, so an existing database is
+upgraded in place without losing data.
 
 > **If you get `ERROR: 42501: must be owner of table messages`**, you have an
 > older copy of `schema.sql` that tried to run

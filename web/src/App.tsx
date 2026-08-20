@@ -20,6 +20,7 @@ import {
   unlockAudio,
 } from './lib/sequencer';
 import { pause, playContext } from './lib/spotify';
+import { bindingsFrom, startListening, type VoiceHandle, type VoiceStatus } from './lib/voice';
 import type { Effect, PartyEvent, Scene, UserSettings } from './lib/types';
 
 type Tab = 'general' | 'scenes' | 'effects';
@@ -89,12 +90,18 @@ function Party({
     user_id: userId,
     max_brightness: 1,
     light_ids: null,
+    voice_enabled: false,
+    voice_language: 'en-US',
+    voice_allow_cloud: false,
   });
   const [activeScene, setActiveScene] = useState<Scene | null>(null);
   const [activeEffect, setActiveEffect] = useState<Effect | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [lastHeard, setLastHeard] = useState<string | null>(null);
 
   const sendRef = useRef<((e: PartyEvent) => void) | null>(null);
   const effectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceRef = useRef<VoiceHandle | null>(null);
 
   // ---- Data loading -------------------------------------------------------
 
@@ -202,6 +209,10 @@ function Party({
             event.leadMs + effect.duration_ms + effect.revert_ms + 500,
           );
 
+          // Our own speakers are about to play this sound. Stop listening for
+          // its duration so the effect audio cannot trigger another effect.
+          voiceRef.current?.suppressFor(event.leadMs + effect.duration_ms + 600);
+
           runEffect(effect, getCachedSound(effect.id), { startDelayMs: event.leadMs });
           break;
         }
@@ -255,6 +266,48 @@ function Party({
     };
   }, [userId, displayName]);
 
+  // ---- Voice ---------------------------------------------------------------
+  // Rebuilt only when the switch, language, or cloud permission changes.
+  // Trigger words are pushed in separately so editing an effect never drops
+  // the microphone.
+  useEffect(() => {
+    if (!settings.voice_enabled) {
+      voiceRef.current?.stop();
+      voiceRef.current = null;
+      setVoiceStatus('idle');
+      return;
+    }
+
+    const handle = startListening({
+      lang: settings.voice_language,
+      processLocally: !settings.voice_allow_cloud,
+      bindings: [],
+      onStatus: (s, detail) => {
+        setVoiceStatus(s);
+        if (detail && (s === 'denied' || s === 'error')) setBanner(`Voice: ${detail}`);
+      },
+      onHeard: setLastHeard,
+      onMatch: (binding) => {
+        setBanner(`Voice: ${binding.name}`);
+        send({ type: 'effect', effectId: binding.effectId, leadMs: 400, by: displayName });
+      },
+    });
+
+    voiceRef.current = handle;
+    return () => {
+      handle.stop();
+      voiceRef.current = null;
+    };
+    // `send` and `displayName` are stable enough for the session; including
+    // them would tear the microphone down on unrelated renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.voice_enabled, settings.voice_language, settings.voice_allow_cloud]);
+
+  // Keep the trigger list current without restarting recognition.
+  useEffect(() => {
+    voiceRef.current?.setBindings(bindingsFrom(effects));
+  }, [effects, voiceStatus]);
+
   const send = useCallback((event: PartyEvent) => {
     // Browsers block audio until a user gesture; every send is one.
     void unlockAudio();
@@ -294,6 +347,15 @@ function Party({
           </span>
 
           {connected && !connected.lifx && <span className="pill warn">LIFX not connected</span>}
+
+          {settings.voice_enabled && (
+            <span
+              className="pill"
+              title={`Voice triggers: ${voiceStatus}${lastHeard ? ` — heard "${lastHeard}"` : ''}`}
+            >
+              <span className={voiceStatus === 'listening' ? 'dot live' : 'dot off'} /> 🎙
+            </span>
+          )}
 
           {settings.max_brightness < 1 && (
             <span className="pill" title="Your personal brightness cap">
@@ -359,6 +421,8 @@ function Party({
         <Connections
           userId={userId}
           settings={settings}
+          voiceStatus={voiceStatus}
+          lastHeard={lastHeard}
           onSettingsChange={setSettings}
           onClose={() => setShowSettings(false)}
         />

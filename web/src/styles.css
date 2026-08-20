@@ -1175,3 +1175,77 @@ input[type='color'] {
   padding: 9px 24px;
   font-size: 12.5px;
 }
+
+/* ==========================================================================
+   Voice triggers
+   ========================================================================== */
+
+.chip-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  min-height: 40px;
+}
+
+.chip-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.chip-input-field {
+  flex: 1;
+  min-width: 130px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 3px 2px !important;
+}
+
+.trigger-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--calm);
+  color: #ffeccc;
+  border-radius: 999px;
+  padding: 3px 4px 3px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.trigger-chip .icon-btn {
+  color: rgba(255, 236, 204, 0.7);
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.trigger-chip .icon-btn:hover {
+  color: #fff;
+  background: transparent;
+}
+
+/* Shown when the spoken form differs from what was typed, e.g. accents. */
+.trigger-norm {
+  font-style: normal;
+  opacity: 0.6;
+  font-size: 11px;
+  border-left: 1px solid rgba(255, 236, 204, 0.3);
+  padding-left: 6px;
+}
+
+.voice-model {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+}
+
+.pill.live {
+  border-color: var(--accent);
+  color: var(--accent);
+}

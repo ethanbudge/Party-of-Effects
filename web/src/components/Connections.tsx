@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, type LifxLight } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Modal } from './Modal';
+import { VoiceSettings } from './VoiceSettings';
 import {
   applyLight,
   calibrationOffsetMs,
@@ -22,11 +23,15 @@ import type { UserSettings } from '../lib/types';
 export function Connections({
   userId,
   settings,
+  voiceStatus,
+  lastHeard,
   onSettingsChange,
   onClose,
 }: {
   userId: string;
   settings: UserSettings;
+  voiceStatus: string;
+  lastHeard: string | null;
   onSettingsChange: (next: UserSettings) => void;
   onClose: () => void;
 }) {
@@ -249,6 +254,13 @@ export function Connections({
           Test at full brightness
         </button>
       </div>
+
+      <VoiceSettings
+        settings={settings}
+        status={voiceStatus}
+        lastHeard={lastHeard}
+        onChange={(patch) => void patchSettings(patch)}
+      />
 
       {/* ---- Timing ---- */}
       <div className="card">

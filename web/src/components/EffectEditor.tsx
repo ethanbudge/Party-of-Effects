@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { ColorWheel } from './ColorWheel';
 import { FrameTimeline, newFrameId, type EditFrame } from './FrameTimeline';
+import { TriggerWords } from './TriggerWords';
 import {
   cancelActiveEffect,
   decodeFile,
@@ -19,6 +20,7 @@ export interface EffectDraft {
   frames: Frame[];
   revert_ms: number;
   duration_ms: number;
+  trigger_words: string[];
   file: File | null;
 }
 
@@ -44,6 +46,7 @@ export function EffectEditor({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revertMs, setRevertMs] = useState(existing?.revert_ms ?? 2000);
+  const [triggers, setTriggers] = useState<string[]>(existing?.trigger_words ?? []);
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [durationMs, setDurationMs] = useState(existing?.duration_ms ?? 0);
@@ -131,6 +134,7 @@ export function EffectEditor({
         duration_ms: durationMs,
         frames: sorted.map(strip),
         revert_ms: revertMs,
+        trigger_words: [],
         created_by: null,
         created_at: '',
       },
@@ -158,6 +162,7 @@ export function EffectEditor({
         frames: sorted.map(strip),
         revert_ms: revertMs,
         duration_ms: durationMs,
+        trigger_words: triggers,
         file,
       });
       onClose();
@@ -399,7 +404,7 @@ export function EffectEditor({
             </>
           )}
 
-          <div className="field" style={{ marginTop: 16, marginBottom: 0 }}>
+          <div className="field" style={{ marginTop: 16 }}>
             <label>Fade back to the scene over {revertMs} ms</label>
             <input
               type="range"
@@ -409,6 +414,11 @@ export function EffectEditor({
               value={revertMs}
               onChange={(e) => setRevertMs(Number(e.target.value))}
             />
+          </div>
+
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Voice triggers</label>
+            <TriggerWords value={triggers} onChange={setTriggers} />
           </div>
         </div>
       </div>

@@ -27,6 +27,8 @@ export interface Effect {
   duration_ms: number;
   frames: Frame[];
   revert_ms: number;
+  /** Spoken phrases that fire this effect. Shared with the group. */
+  trigger_words: string[];
   created_by: string | null;
   created_at: string;
 }
@@ -59,6 +61,12 @@ export interface UserSettings {
   max_brightness: number;
   /** LIFX light ids to control. Null or empty means all of them. */
   light_ids: string[] | null;
+  /** Listen for trigger words on this machine. Off unless asked for. */
+  voice_enabled: boolean;
+  /** BCP-47 tag, e.g. 'fr-FR'. */
+  voice_language: string;
+  /** Permit cloud recognition when no on-device model is available. */
+  voice_allow_cloud: boolean;
 }
 
 export type MusicAction = 'play' | 'pause' | 'resume' | 'next' | 'previous';

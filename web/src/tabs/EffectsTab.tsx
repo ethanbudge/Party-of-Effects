@@ -33,7 +33,7 @@ export function EffectsTab({
       hero: framesToGradient(e.frames, e.duration_ms),
       meta: `${(e.duration_ms / 1000).toFixed(2)}s · ${e.frames.length} frames${
         e.sound_path ? '' : ' · silent'
-      }`,
+      }${e.trigger_words.length ? ' · 🎙' : ''}`,
       ticks: e.frames.map((f) => Math.min(1, f.t_ms / span)),
     };
   });
@@ -53,6 +53,7 @@ export function EffectsTab({
         frames: draft.frames,
         revert_ms: draft.revert_ms,
         duration_ms: draft.duration_ms,
+        trigger_words: draft.trigger_words,
         sound_path: soundPath,
       });
     } else {
@@ -61,6 +62,7 @@ export function EffectsTab({
         frames: draft.frames,
         revert_ms: draft.revert_ms,
         duration_ms: draft.duration_ms,
+        trigger_words: draft.trigger_words,
         sound_path: soundPath,
         created_by: userId,
       });
