@@ -127,13 +127,20 @@ plenty, and means you never need Spotify's app review.
 **3. Environment files**
 
 ```bash
-cp server/.env.example server/.env
-cp web/.env.example web/.env
-openssl rand -base64 32          # paste into CREDENTIAL_ENC_KEY in server/.env
+bash scripts/setup-env.sh
 ```
 
-Fill in both files. Back up `CREDENTIAL_ENC_KEY` — if you lose it, everyone has
-to reconnect LIFX and Spotify.
+Prompts for the six values you copy out of the Supabase and Spotify dashboards,
+generates `CREDENTIAL_ENC_KEY` for you, and writes `server/.env` and `web/.env`
+with the right variable in the right file. It refuses to continue if the anon
+and service_role keys are swapped — that mistake would ship an RLS-bypassing key
+to every browser, and it's silent otherwise.
+
+Prefer doing it by hand? Copy `server/.env.example` and `web/.env.example` and
+fill them in; `openssl rand -base64 32` generates the encryption key.
+
+Either way, back up `CREDENTIAL_ENC_KEY` somewhere outside the repo — if you lose
+it, everyone has to reconnect LIFX and Spotify.
 
 **4. Run**
 

@@ -54,6 +54,17 @@ API → JWT Settings), copy it into `SUPABASE_JWT_SECRET` in `server/.env`. If y
 don't see one, leave that variable blank — the server will verify tokens against
 your project's public JWKS endpoint instead.
 
+**Don't hand-edit the files.** Run this instead and paste the values when asked:
+
+```bash
+bash scripts/setup-env.sh
+```
+
+It puts each value in the right file, generates `CREDENTIAL_ENC_KEY`, sets the
+files to `chmod 600`, and stops if the anon and service_role keys are swapped.
+That swap is the one mistake worth guarding against: it publishes a key that
+bypasses every RLS policy on this page to anyone who loads the app.
+
 ---
 
 ## 4. Configure auth
