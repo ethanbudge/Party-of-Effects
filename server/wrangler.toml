@@ -1,0 +1,27 @@
+# Cloudflare Workers deployment config.
+#
+# Nothing here is needed to run locally — `npm run dev` uses src/node.ts.
+# This file exists so that when you're ready to go live it's a one-liner.
+#
+# Deploy:
+#   cd server
+#   npx wrangler login
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   npx wrangler secret put CREDENTIAL_ENC_KEY
+#   npx wrangler secret put SPOTIFY_CLIENT_SECRET
+#   npx wrangler secret put SUPABASE_JWT_SECRET     # only if your project uses legacy HS256
+#   npx wrangler deploy
+
+name = "party-of-effects-api"
+main = "src/worker.ts"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+
+# Non-secret config. Secrets go in via `wrangler secret put`, never here.
+[vars]
+SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
+SPOTIFY_CLIENT_ID = "your_spotify_client_id"
+SPOTIFY_REDIRECT_URI = "https://api.yourdomain.com/api/spotify/callback"
+WEB_APP_URL = "https://yourdomain.com"
+
+# Local secrets for `wrangler dev` live in server/.dev.vars (gitignored).

@@ -1,0 +1,135 @@
+# Supabase setup
+
+Everything you need to do inside Supabase, in order. Takes about ten minutes.
+
+---
+
+## 1. Create the project
+
+1. Go to <https://supabase.com/dashboard> → **New project**.
+2. Name it whatever you like. Pick the region closest to most of your group.
+3. Set a database password and save it somewhere. You won't need it for this app,
+   but you'll want it if you ever connect directly.
+4. Wait for the project to finish provisioning (~2 minutes).
+
+---
+
+## 2. Run the schema
+
+1. In the left sidebar: **SQL Editor** → **New query**.
+2. Open `supabase/schema.sql` from this repo, copy the whole file, paste it in.
+3. Click **Run**.
+
+You should see "Success. No rows returned." This creates every table, all the
+Row Level Security policies, the storage bucket for sound files, and the trigger
+that gives each new user a profile.
+
+The file is safe to re-run if you ever need to.
+
+> If the last block (the `realtime.messages` policies) errors with a permissions
+> complaint, delete just that block and re-run it. On some project tiers you
+> instead enable this under **Realtime** settings. Everything else in the file
+> matters more — don't skip the rest over it.
+
+---
+
+## 3. Collect your keys
+
+Go to **Project Settings** → **API** (newer dashboards split this into
+**Data API** and **API Keys**). You need three values:
+
+| Value | Goes in | Notes |
+|---|---|---|
+| Project URL | `web/.env` and `server/.env` | e.g. `https://abcdefgh.supabase.co` |
+| `anon` / publishable key | `web/.env` | Safe to ship to browsers |
+| `service_role` / secret key | `server/.env` **only** | **Bypasses all RLS. Never put this in `web/`.** |
+
+If your project also shows a **JWT Secret** (older projects, under Settings →
+API → JWT Settings), copy it into `SUPABASE_JWT_SECRET` in `server/.env`. If you
+don't see one, leave that variable blank — the server will verify tokens against
+your project's public JWKS endpoint instead.
+
+---
+
+## 4. Configure auth
+
+Go to **Authentication** → **Sign In / Providers** → **Email**:
+
+- **Confirm email** — turn this **off** for now. Otherwise every account needs a
+  working inbox round-trip before it can log in, and Supabase's built-in mailer
+  is rate-limited to a handful of messages an hour. You can turn it back on later
+  once you've set up your own SMTP.
+- Leave **Enable email provider** on.
+
+Then go to **Authentication** → **URL Configuration**:
+
+- **Site URL**: `http://127.0.0.1:5173` for local development.
+  Change this to your real domain when you deploy.
+
+---
+
+## 5. Create your group's accounts, then lock the door
+
+This is the step that actually makes the app private, so don't skip the second half.
+
+1. Start the app (`npm run dev`) and have each person sign up, **or** create their
+   accounts yourself under **Authentication** → **Users** → **Add user**.
+2. Once everyone has an account: **Authentication** → **Sign In / Providers** →
+   **Email** → turn **"Allow new users to sign up"** OFF.
+
+After that toggle is off, nobody new can create an account — not through the
+app's signup form, and not by calling the Supabase API directly with the public
+anon key. Before you flip it, anyone who finds your URL can sign up.
+
+To add someone later, add them manually under **Authentication → Users**. You
+don't need to re-open public signups.
+
+---
+
+## 6. Check the storage bucket
+
+**Storage** in the sidebar should show a bucket called `effect-sounds`, marked
+**Private**. The schema created it. If it's missing, create it manually with that
+exact name and leave "Public bucket" unchecked — sound files are served through
+short-lived signed URLs, not public links.
+
+---
+
+## 7. Verify RLS is doing its job
+
+Worth thirty seconds, because this is the control protecting everyone's tokens.
+
+**SQL Editor** → new query:
+
+```sql
+select tablename, rowsecurity
+from pg_tables
+where schemaname = 'public'
+order by tablename;
+```
+
+Every row must show `rowsecurity = true`. Then:
+
+```sql
+select tablename, count(*) as policies
+from pg_policies
+where schemaname = 'public'
+group by tablename
+order by tablename;
+```
+
+`user_credentials` should **not appear in this list at all**. That's correct and
+intentional: RLS enabled with zero policies means Postgres denies every read and
+write from the browser's anon key. Only the server's `service_role` key can reach
+that table, and it only ever does so on behalf of the user whose own login token
+came in on the request.
+
+---
+
+## What you do NOT need
+
+- No Edge Functions.
+- No Supabase CLI or local Docker stack.
+- No database migrations tooling — `schema.sql` is the whole schema.
+- No paid tier. A group of 4–8 people fits comfortably in the free plan; the
+  sound files are the only meaningful storage and they're a few MB total.

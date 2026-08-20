@@ -1,0 +1,22 @@
+{
+  "name": "party-of-effects",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c magenta,cyan \"npm -w @party-of-effects/server run dev\" \"npm -w @party-of-effects/web run dev\"",
+    "dev:api": "npm -w @party-of-effects/server run dev",
+    "dev:web": "npm -w @party-of-effects/web run dev",
+    "build": "npm -w @party-of-effects/server run build && npm -w @party-of-effects/web run build",
+    "typecheck": "npm -w @party-of-effects/server run typecheck && npm -w @party-of-effects/web run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
