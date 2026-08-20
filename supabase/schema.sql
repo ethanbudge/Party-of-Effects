@@ -231,10 +231,19 @@ create policy "sounds deletable by group"
 -- Realtime: lock the broadcast channel to logged-in users only
 -- ---------------------------------------------------------------------------
 -- Supabase Realtime "private" channels authorise against realtime.messages.
--- This policy says: you must be an authenticated user to send or receive on
+-- These policies say: you must be an authenticated user to send or receive on
 -- any channel. That is what makes "friends can only change your lights while
 -- you are logged in" true at the transport layer as well as the API layer.
-alter table realtime.messages enable row level security;
+--
+-- Note: do NOT add `alter table realtime.messages enable row level security`
+-- here. RLS is already enabled on that table by Supabase, the `realtime`
+-- schema is locked down, and the statement fails with
+-- "42501: must be owner of table messages". Managing policies is permitted;
+-- altering the table is not.
+--
+-- These policies are only half of it. You must ALSO turn off
+-- "Allow public access" under Realtime Settings in the dashboard, or private
+-- channels are not enforced and the policies below go unconsulted.
 
 drop policy if exists "authenticated realtime access" on realtime.messages;
 create policy "authenticated realtime access"

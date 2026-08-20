@@ -26,10 +26,15 @@ that gives each new user a profile.
 
 The file is safe to re-run if you ever need to.
 
-> If the last block (the `realtime.messages` policies) errors with a permissions
-> complaint, delete just that block and re-run it. On some project tiers you
-> instead enable this under **Realtime** settings. Everything else in the file
-> matters more — don't skip the rest over it.
+> **If you get `ERROR: 42501: must be owner of table messages`**, you have an
+> older copy of `schema.sql` that tried to run
+> `alter table realtime.messages enable row level security`. Pull the latest
+> version of the repo — that line is gone. RLS is already enabled on that table
+> by Supabase, and the `realtime` schema is locked so the statement can never
+> succeed. Creating *policies* there is allowed; altering the table is not.
+>
+> The SQL editor runs the file in a transaction, so a failure anywhere rolls the
+> whole thing back — nothing was half-applied. Just re-run the corrected file.
 
 ---
 
@@ -95,7 +100,20 @@ short-lived signed URLs, not public links.
 
 ---
 
-## 7. Verify RLS is doing its job
+## 7. Lock down the Realtime channel
+
+Go to **Realtime** → **Settings** and turn **"Allow public access"** OFF.
+
+Don't skip this one. The policies in `schema.sql` restrict the broadcast channel
+to authenticated users, but they are only *consulted* when public access is
+disabled. Leave it on and the app's `private: true` channel setting is ignored —
+anyone who loads the page can pull the public anon key out of the JavaScript
+bundle, connect to the channel without logging in, and fire effects at whoever
+is currently online. With it off, joining the channel requires a real login.
+
+---
+
+## 8. Verify RLS is doing its job
 
 Worth thirty seconds, because this is the control protecting everyone's tokens.
 
@@ -123,6 +141,18 @@ intentional: RLS enabled with zero policies means Postgres denies every read and
 write from the browser's anon key. Only the server's `service_role` key can reach
 that table, and it only ever does so on behalf of the user whose own login token
 came in on the request.
+
+Finally, confirm the two Realtime policies landed:
+
+```sql
+select policyname, cmd
+from pg_policies
+where schemaname = 'realtime' and tablename = 'messages';
+```
+
+You should get two rows — one `SELECT` (receive) and one `INSERT` (send). If this
+comes back empty, the broadcast channel will reject every subscription and the
+app will sit on "connecting…" forever.
 
 ---
 
