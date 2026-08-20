@@ -5,15 +5,27 @@ import { api } from './lib/api';
 import * as db from './lib/data';
 import { Auth } from './components/Auth';
 import { Connections } from './components/Connections';
+import { NowPlaying } from './components/NowPlaying';
 import { GeneralTab } from './tabs/GeneralTab';
 import { ScenesTab } from './tabs/ScenesTab';
 import { EffectsTab } from './tabs/EffectsTab';
 import { joinParty, type PartyMember } from './lib/realtime';
-import { applyLight, getCachedSound, loadSound, runEffect, setAmbient, unlockAudio } from './lib/sequencer';
+import {
+  applyLight,
+  getCachedSound,
+  loadSound,
+  runEffect,
+  setAmbient,
+  setLightProfile,
+  unlockAudio,
+} from './lib/sequencer';
 import { pause, playContext } from './lib/spotify';
-import type { Effect, PartyEvent, Scene } from './lib/types';
+import type { Effect, PartyEvent, Scene, UserSettings } from './lib/types';
 
 type Tab = 'general' | 'scenes' | 'effects';
+type Theme = 'dark' | 'light';
+
+const THEME_KEY = 'poe.theme';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -29,14 +41,39 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  // Theme lives at the root so it applies to the auth screen too.
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem(THEME_KEY) as Theme) ?? 'dark',
+  );
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
+
   if (!ready) return null;
   if (!session) return <Auth />;
 
   // Remount everything on user change so no state leaks between accounts.
-  return <Party key={session.user.id} session={session} />;
+  return (
+    <Party
+      key={session.user.id}
+      session={session}
+      theme={theme}
+      onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+    />
+  );
 }
 
-function Party({ session }: { session: Session }) {
+function Party({
+  session,
+  theme,
+  onToggleTheme,
+}: {
+  session: Session;
+  theme: Theme;
+  onToggleTheme: () => void;
+}) {
   const userId = session.user.id;
 
   const [tab, setTab] = useState<Tab>('general');
@@ -44,12 +81,20 @@ function Party({ session }: { session: Session }) {
   const [effects, setEffects] = useState<Effect[]>([]);
   const [members, setMembers] = useState<PartyMember[]>([]);
   const [displayName, setDisplayName] = useState('Adventurer');
-  const [showConnections, setShowConnections] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [connected, setConnected] = useState<{ lifx: boolean; spotify: boolean } | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [channelStatus, setChannelStatus] = useState('CONNECTING');
+  const [settings, setSettings] = useState<UserSettings>({
+    user_id: userId,
+    max_brightness: 1,
+    light_ids: null,
+  });
+  const [activeScene, setActiveScene] = useState<Scene | null>(null);
+  const [activeEffect, setActiveEffect] = useState<Effect | null>(null);
 
   const sendRef = useRef<((e: PartyEvent) => void) | null>(null);
+  const effectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- Data loading -------------------------------------------------------
 
@@ -62,19 +107,27 @@ function Party({ session }: { session: Session }) {
         await Promise.all([reloadScenes(), reloadEffects()]);
         const profiles = await db.listProfiles();
         setDisplayName(profiles.find((p) => p.id === userId)?.display_name ?? 'Adventurer');
+        setSettings(await db.getSettings(userId));
       } catch (err) {
         setBanner((err as Error).message);
       }
     })();
   }, [reloadScenes, reloadEffects, userId]);
 
-  // Nudge people through setup — nothing works without these two.
+  // Push settings into the sequencer, which applies them to every light command.
+  useEffect(() => {
+    setLightProfile({
+      maxBrightness: settings.max_brightness,
+      selector: db.lightSelector(settings.light_ids),
+    });
+  }, [settings]);
+
   useEffect(() => {
     void api
       .status()
       .then((s) => {
         setConnected(s);
-        if (!s.lifx) setShowConnections(true);
+        if (!s.lifx) setShowSettings(true);
       })
       .catch(() => setConnected({ lifx: false, spotify: false }));
   }, []);
@@ -93,9 +146,6 @@ function Party({ session }: { session: Session }) {
   }, []);
 
   // ---- Sound preloading ---------------------------------------------------
-  // Decoding at trigger time would blow the timing budget, so every effect's
-  // audio is fetched and decoded up front and held in memory.
-
   useEffect(() => {
     for (const effect of effects) {
       if (!effect.sound_path || getCachedSound(effect.id)) continue;
@@ -108,8 +158,6 @@ function Party({ session }: { session: Session }) {
 
   // ---- Party events -------------------------------------------------------
 
-  // Held in a ref so the realtime subscription below can stay mounted for the
-  // life of the session while still seeing current scenes/effects.
   const handleEvent = useCallback(
     (event: PartyEvent) => {
       switch (event.type) {
@@ -119,6 +167,7 @@ function Party({ session }: { session: Session }) {
             brightness: event.brightness,
             durationMs: event.durationMs,
           });
+          setActiveScene(null);
           void applyLight(
             { hex: event.hex, brightness: event.brightness, durationMs: event.durationMs },
             event.power,
@@ -130,6 +179,7 @@ function Party({ session }: { session: Session }) {
           const scene = scenes.find((s) => s.id === event.sceneId);
           if (!scene) return;
 
+          setActiveScene(scene);
           setAmbient({ hex: scene.hex, brightness: scene.brightness, durationMs: 1500 });
           void applyLight({ hex: scene.hex, brightness: scene.brightness, durationMs: 1500 });
 
@@ -145,17 +195,35 @@ function Party({ session }: { session: Session }) {
           const effect = effects.find((e) => e.id === event.effectId);
           if (!effect) return;
 
+          setActiveEffect(effect);
+          if (effectTimer.current) clearTimeout(effectTimer.current);
+          effectTimer.current = setTimeout(
+            () => setActiveEffect(null),
+            event.leadMs + effect.duration_ms + effect.revert_ms + 500,
+          );
+
           runEffect(effect, getCachedSound(effect.id), { startDelayMs: event.leadMs });
           break;
         }
 
         case 'music': {
-          if (event.contextUri) {
-            playContext(event.contextUri).catch((err) =>
-              setBanner(`Spotify: ${(err as Error).message}`),
-            );
-          } else {
-            void pause();
+          const fail = (err: unknown) => setBanner(`Spotify: ${(err as Error).message}`);
+          switch (event.action) {
+            case 'play':
+              if (event.contextUri) playContext(event.contextUri).catch(fail);
+              break;
+            case 'pause':
+              pause().catch(fail);
+              break;
+            case 'resume':
+              api.spotifyResume().catch(fail);
+              break;
+            case 'next':
+              api.spotifyNext().catch(fail);
+              break;
+            case 'previous':
+              api.spotifyPrevious().catch(fail);
+              break;
           }
           break;
         }
@@ -164,6 +232,8 @@ function Party({ session }: { session: Session }) {
     [scenes, effects],
   );
 
+  // Held in a ref so the realtime subscription can stay mounted for the life of
+  // the session while still seeing current scenes/effects.
   const handlerRef = useRef(handleEvent);
   handlerRef.current = handleEvent;
 
@@ -198,7 +268,9 @@ function Party({ session }: { session: Session }) {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">Party of Effects</span>
+        <span className="brand">
+          Party of <span>Effects</span>
+        </span>
 
         <nav className="tabs">
           {(['general', 'scenes', 'effects'] as Tab[]).map((t) => (
@@ -221,30 +293,32 @@ function Party({ session }: { session: Session }) {
             {live ? `${members.length} online` : 'connecting…'}
           </span>
 
-          {connected && !connected.lifx && (
-            <span className="pill" style={{ borderColor: 'var(--danger)' }}>
-              LIFX not connected
+          {connected && !connected.lifx && <span className="pill warn">LIFX not connected</span>}
+
+          {settings.max_brightness < 1 && (
+            <span className="pill" title="Your personal brightness cap">
+              cap {Math.round(settings.max_brightness * 100)}%
             </span>
           )}
 
-          <button className="btn secondary sm" onClick={() => setShowConnections(true)}>
+          <button
+            className="icon-btn"
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to the cream theme' : 'Switch to the dark theme'}
+          >
+            {theme === 'dark' ? '☀' : '☾'}
+          </button>
+
+          <button className="btn secondary sm" onClick={() => setShowSettings(true)}>
             {displayName}
           </button>
         </div>
       </header>
 
       {banner && (
-        <div
-          className="row"
-          style={{
-            background: 'var(--bg-input)',
-            borderBottom: '1px solid var(--border)',
-            padding: '8px 20px',
-            fontSize: 12.5,
-          }}
-        >
+        <div className="banner">
           <span style={{ flex: 1 }}>{banner}</span>
-          <button className="chip-x" onClick={() => setBanner(null)}>
+          <button className="icon-btn" onClick={() => setBanner(null)}>
             ✕
           </button>
         </div>
@@ -274,7 +348,21 @@ function Party({ session }: { session: Session }) {
         )}
       </main>
 
-      {showConnections && <Connections onClose={() => setShowConnections(false)} />}
+      <NowPlaying
+        scene={activeScene}
+        effect={activeEffect}
+        send={send}
+        displayName={displayName}
+      />
+
+      {showSettings && (
+        <Connections
+          userId={userId}
+          settings={settings}
+          onSettingsChange={setSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
+import { ColorWheel } from './ColorWheel';
 import { normalisePlaylistUri } from '../lib/spotify';
+import { sceneGradient } from '../lib/color';
 import type { Scene } from '../lib/types';
 
 export interface SceneDraft {
@@ -28,6 +30,7 @@ export function SceneEditor({
 
   async function save() {
     if (!name.trim()) return setError('Give the scene a name.');
+    if (!/^#[0-9A-F]{6}$/i.test(hex)) return setError('Pick a valid colour.');
 
     let uri: string | null = null;
     if (playlist.trim()) {
@@ -40,7 +43,7 @@ export function SceneEditor({
     setBusy(true);
     setError(null);
     try {
-      await onSave({ name: name.trim(), hex, brightness, playlist_uri: uri });
+      await onSave({ name: name.trim(), hex: hex.toUpperCase(), brightness, playlist_uri: uri });
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -50,6 +53,17 @@ export function SceneEditor({
 
   return (
     <Modal title={existing ? 'Edit scene' : 'New scene'} onClose={onClose}>
+      {/* Shows exactly how the tile will look. */}
+      <div
+        style={{
+          height: 92,
+          borderRadius: 'var(--radius)',
+          marginBottom: 18,
+          background: sceneGradient(hex, brightness),
+          border: '1px solid var(--border-strong)',
+        }}
+      />
+
       <div className="field">
         <label htmlFor="sname">Name</label>
         <input
@@ -61,47 +75,14 @@ export function SceneEditor({
         />
       </div>
 
-      <div
-        className="swatch-lg"
-        style={{
-          background: hex,
-          opacity: 0.25 + brightness * 0.75,
-          marginBottom: 14,
-        }}
-      />
-
-      <div className="row" style={{ marginBottom: 14 }}>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="shex">Colour</label>
-          <input
-            id="shex"
-            type="color"
-            value={hex}
-            onChange={(e) => setHex(e.target.value.toUpperCase())}
-          />
-        </div>
-        <div className="field" style={{ flex: 1, marginBottom: 0 }}>
-          <label htmlFor="shexT">Hex</label>
-          <input
-            id="shexT"
-            type="text"
-            value={hex}
-            onChange={(e) => setHex(e.target.value.toUpperCase())}
-            placeholder="#CC7820"
-          />
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="sbright">Brightness — {Math.round(brightness * 100)}%</label>
-        <input
-          id="sbright"
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={brightness}
-          onChange={(e) => setBrightness(Number(e.target.value))}
+      <div style={{ marginBottom: 18 }}>
+        <ColorWheel
+          hex={hex}
+          brightness={brightness}
+          onChange={({ hex: h, brightness: b }) => {
+            setHex(h);
+            setBrightness(b);
+          }}
         />
       </div>
 

@@ -1,7 +1,50 @@
 import { supabase } from './supabase';
-import type { Effect, Folder, FolderItem, Frame, Kind, Profile, Scene } from './types';
+import type {
+  Effect,
+  Folder,
+  FolderItem,
+  Frame,
+  Kind,
+  Profile,
+  Scene,
+  UserSettings,
+} from './types';
 
 const BUCKET = 'effect-sounds';
+
+// ---------------------------------------------------------------------------
+// Per-user settings (owner-only by RLS)
+// ---------------------------------------------------------------------------
+
+export async function getSettings(userId: string): Promise<UserSettings> {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as UserSettings) ?? { user_id: userId, max_brightness: 1, light_ids: null };
+}
+
+export async function saveSettings(
+  userId: string,
+  patch: Partial<Omit<UserSettings, 'user_id'>>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert(
+      { user_id: userId, ...patch, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    );
+  if (error) throw error;
+}
+
+/** Turn selected light ids into a LIFX selector. Empty/null means every light. */
+export function lightSelector(ids: string[] | null | undefined): string {
+  if (!ids || ids.length === 0) return 'all';
+  return ids.map((id) => `id:${id}`).join(',');
+}
 
 // ---------------------------------------------------------------------------
 // Scenes

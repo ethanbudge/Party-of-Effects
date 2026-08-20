@@ -53,6 +53,16 @@ export interface Profile {
   display_name: string;
 }
 
+export interface UserSettings {
+  user_id: string;
+  /** Scales every light command this person issues. 1 = no cap. */
+  max_brightness: number;
+  /** LIFX light ids to control. Null or empty means all of them. */
+  light_ids: string[] | null;
+}
+
+export type MusicAction = 'play' | 'pause' | 'resume' | 'next' | 'previous';
+
 /** Messages sent over the Supabase Realtime broadcast channel. */
 export type PartyEvent =
   | { type: 'effect'; effectId: string; leadMs: number; by: string }
@@ -65,4 +75,4 @@ export type PartyEvent =
       power?: 'on' | 'off';
       by: string;
     }
-  | { type: 'music'; contextUri: string | null; by: string };
+  | { type: 'music'; action: MusicAction; contextUri?: string; by: string };

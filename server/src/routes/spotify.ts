@@ -195,6 +195,38 @@ spotifyRoutes.put('/play', requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
+/** Skip forward / back on this user's own playback. */
+for (const [route, endpoint] of [
+  ['/next', 'next'],
+  ['/previous', 'previous'],
+] as const) {
+  spotifyRoutes.post(route, requireAuth, async (c) => {
+    let accessToken: string;
+    try {
+      accessToken = await getAccessToken(c.env, c.get('user').id);
+    } catch {
+      return c.json({ error: 'Spotify not connected.' }, 409);
+    }
+
+    const res = await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (res.status === 404) {
+      return c.json({ error: 'No active Spotify device found in this tab yet.' }, 409);
+    }
+    if (res.status === 403) {
+      return c.json({ error: 'Spotify Premium is required for playback control.' }, 403);
+    }
+    if (!res.ok && res.status !== 204) {
+      return c.json({ error: `Spotify returned ${res.status}` }, 502);
+    }
+
+    return c.json({ ok: true });
+  });
+}
+
 spotifyRoutes.put('/pause', requireAuth, async (c) => {
   let accessToken: string;
   try {

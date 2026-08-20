@@ -175,8 +175,49 @@ shared with the group.
 
 **Folders** are on both tabs and are **private to each person**. The scene and
 effect libraries are shared — anyone can add or delete — but how you organise
-them into folders is yours alone. Drag from the library drawer at the bottom into
-a folder, drag between folders, or drag back to the drawer to unfile.
+them into folders is yours alone. Drag a tile's coloured area into a folder, drag
+between folders, or drag back to the drawer to unfile.
+
+Each tile is a **gradient hero card**. A scene shows its colour at its actual
+brightness; an effect shows a left-to-right gradient through its frames *in time
+order*, with tick marks where the keyframes fall. So Fireball's tile visibly
+darkens, flashes bright at the explosion, and decays — you can pick an effect out
+of a grid by its shape without reading the label.
+
+### Editing an effect
+
+The timeline is the centre of it. Click anywhere to drop a keyframe, drag a
+marker to move it in time, click one to edit its colour, and use ← → to nudge
+(Shift for 100 ms steps, Backspace to delete). The waveform sits behind the
+markers so you can put the flash exactly on the audio peak, and **Preview**
+runs the whole thing on your own lights with a playhead tracking along.
+
+Colour is picked on a **hue/saturation wheel** with a separate brightness slider
+and a white-temperature strip, matching how the LIFX app presents colour. That
+separation is deliberate: on a bulb, saturation and brightness are independent
+controls, and a browser's default square picker conflates them.
+
+### Per-person settings
+
+Two settings under your name in the top bar exist so people with different rooms
+can share the same effects:
+
+- **Maximum brightness** scales everything sent to your lights. At an 80% cap, an
+  effect authored at 50% lands at 40% on your bulbs. It applies to effects other
+  people trigger too, because each browser applies *its own* cap — so you can sit
+  at a comfortable level without anyone re-authoring anything.
+- **Which lights take part** limits the app to the bulbs you tick. Unticked bulbs
+  are never sent a command at all, so they stay exactly as you left them.
+
+Both are stored per user with owner-only RLS, and applied at the single point
+where light commands leave the app — so they cover scenes, effects, and the
+General tab identically.
+
+### Now playing
+
+Two docks in the bottom-left corner: the current effect, and the current scene
+with its Spotify track. The music dock's skip, pause, and resume act on
+*everyone*, so you can move past a track without anyone falling out of sync.
 
 ---
 
@@ -202,10 +243,19 @@ Two fixups were needed on the way across:
 - **Names.** Rendered the way the R addin's buttons did, via `toTitleCase` — so
   "Ray of Frost", not "Ray Of Frost".
 
-**Effects arrive silent.** The `.wav` files were never committed to dndlights
-(`inst/sounds/` holds only a `.gitkeep`), so lights work immediately but nothing
-plays. Open an effect in the app and attach the file to add audio; names match
-the originals, so `Fireball` wants `fireball.wav`.
+**Sounds come from the dndlights `sounds` release**, which has all 43 `.wav`
+files (~95 MB). After loading the seed:
+
+```bash
+node scripts/import-sounds.mjs
+```
+
+Each file is downloaded, uploaded to the `effect-sounds` bucket, and attached to
+the effect whose name matches (`Fireball` → `fireball.wav`). Re-running skips
+anything that already has audio; `--force` re-uploads, `--dry-run` just lists.
+
+Effects seeded without audio still work — the lights run, there's just no sound —
+so this step can wait.
 
 To regenerate after changing dndlights:
 

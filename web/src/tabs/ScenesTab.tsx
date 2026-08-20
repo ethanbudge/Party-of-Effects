@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { FolderBoard, type BoardItem } from '../components/FolderBoard';
+import { FolderBoard } from '../components/FolderBoard';
+import type { TileData } from '../components/TileCard';
 import { SceneEditor, type SceneDraft } from '../components/SceneEditor';
 import { useFolders } from '../lib/useFolders';
+import { sceneGradient } from '../lib/color';
 import * as db from '../lib/data';
 import type { PartyEvent, Scene } from '../lib/types';
 
@@ -22,36 +24,40 @@ export function ScenesTab({
   const [editing, setEditing] = useState<Scene | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const items: BoardItem[] = scenes.map((s) => ({
+  const tiles: TileData[] = scenes.map((s) => ({
     id: s.id,
     name: s.name,
-    swatch: s.hex,
-    subtitle: s.playlist_uri ? `${s.name} — with playlist` : s.name,
+    hero: sceneGradient(s.hex, s.brightness),
+    meta: `${Math.round(s.brightness * 100)}% · ${s.playlist_uri ? 'playlist' : 'no playlist'}`,
   }));
 
   async function save(draft: SceneDraft) {
-    if (editing) {
-      await db.updateScene(editing.id, draft);
-    } else {
-      await db.createScene({ ...draft, created_by: userId });
-    }
+    if (editing) await db.updateScene(editing.id, draft);
+    else await db.createScene({ ...draft, created_by: userId });
     await reloadScenes();
   }
 
   return (
     <div className="page">
+      <div className="page-head">
+        <h1>Scenes</h1>
+        <span className="meta">
+          {scenes.length} in the shared library · folders are yours alone
+        </span>
+      </div>
+
       <FolderBoard
         kind="scene"
-        items={items}
+        tiles={tiles}
         folders={folders.folders}
         folderItems={folders.items}
-        onFire={(item) => send({ type: 'scene', sceneId: item.id, by: displayName })}
-        onEdit={(item) => {
-          const scene = scenes.find((s) => s.id === item.id);
+        onFire={(tile) => send({ type: 'scene', sceneId: tile.id, by: displayName })}
+        onEdit={(tile) => {
+          const scene = scenes.find((s) => s.id === tile.id);
           if (scene) setEditing(scene);
         }}
-        onDelete={async (item) => {
-          await db.deleteScene(item.id);
+        onDelete={async (tile) => {
+          await db.deleteScene(tile.id);
           await Promise.all([reloadScenes(), folders.reload()]);
         }}
         onCreateFolder={folders.createFolder}
@@ -62,8 +68,8 @@ export function ScenesTab({
         onUnfile={folders.unfile}
       />
 
-      <button className="fab" onClick={() => setCreating(true)} title="New scene">
-        +
+      <button className="fab" onClick={() => setCreating(true)}>
+        <span className="fab-plus">+</span> New scene
       </button>
 
       {(creating || editing) && (

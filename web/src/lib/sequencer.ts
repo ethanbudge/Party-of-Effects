@@ -146,15 +146,50 @@ export function getAmbient(): LightState {
   return ambient;
 }
 
+/**
+ * Per-person light preferences, applied to every outgoing command.
+ *
+ * This is the one place light commands leave the app, so capping brightness
+ * and limiting which bulbs are touched here covers effects, scenes, and the
+ * General tab alike — and it always uses the settings of the person whose
+ * bulb is changing, never whoever pressed the button.
+ */
+export interface LightProfile {
+  /** Scales every brightness. 0.8 means an effect's 50% lands at 40%. */
+  maxBrightness: number;
+  /** LIFX selector, e.g. `all` or `id:d073d5aa,id:d073d5bb`. */
+  selector: string;
+}
+
+let lightProfile: LightProfile = { maxBrightness: 1, selector: 'all' };
+
+export function setLightProfile(p: LightProfile): void {
+  lightProfile = p;
+}
+
+export function getLightProfile(): LightProfile {
+  return lightProfile;
+}
+
 async function sendLight(
   hex: string,
   brightness: number,
   durationMs: number,
   power?: 'on' | 'off',
 ): Promise<void> {
+  const scaled =
+    Math.max(0, Math.min(1, brightness)) * Math.max(0, Math.min(1, lightProfile.maxBrightness));
+
   const t0 = performance.now();
   try {
-    await api.setLight({ hex, brightness, durationMs, power, fast: true });
+    await api.setLight({
+      hex,
+      brightness: scaled,
+      durationMs,
+      power,
+      fast: true,
+      selector: lightProfile.selector,
+    });
     recordLatency(performance.now() - t0);
   } catch (err) {
     // A dropped frame mid-effect should never abort the rest of the sequence.
@@ -188,7 +223,13 @@ let activeRun: RunHandle | null = null;
 export function runEffect(
   effect: Effect,
   buffer: AudioBuffer | undefined,
-  opts: { startDelayMs?: number; onFrame?: (i: number) => void } = {},
+  opts: {
+    startDelayMs?: number;
+    onFrame?: (i: number) => void;
+    /** Elapsed ms relative to the sound's start; negative during the lead-in.
+     *  Called once more with `null` when the run finishes or is cancelled. */
+    onProgress?: (ms: number | null) => void;
+  } = {},
 ): RunHandle {
   // Only one effect at a time — overlapping sequences fight over the bulb.
   activeRun?.cancel();
@@ -228,6 +269,8 @@ export function runEffect(
     if (cancelled) return;
     const now = c.currentTime;
 
+    opts.onProgress?.((now - startAt) * 1000);
+
     while (next < frames.length && sendAt[next]! <= now) {
       const f = frames[next]!;
       void sendLight(f.hex, f.brightness, f.fade_ms);
@@ -242,6 +285,7 @@ export function runEffect(
 
     if (next >= frames.length && reverted) {
       clearInterval(timer);
+      opts.onProgress?.(null);
       if (activeRun === handle) activeRun = null;
     }
   }, TICK_MS);
@@ -250,6 +294,7 @@ export function runEffect(
     cancel() {
       cancelled = true;
       clearInterval(timer);
+      opts.onProgress?.(null);
       try {
         source?.stop();
       } catch {

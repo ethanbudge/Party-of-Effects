@@ -88,6 +88,34 @@ alter table public.user_credentials force row level security;
 
 
 -- ---------------------------------------------------------------------------
+-- user_settings — per-person comfort settings. Owner-only.
+-- ---------------------------------------------------------------------------
+-- max_brightness scales every light command this person's browser issues, so
+-- someone with a bulb right next to their monitor can cap it at 60% and still
+-- take part in effects authored at 100%. It is applied client-side, by each
+-- person's own session, so it always reflects the settings of the person whose
+-- light is being changed rather than whoever pressed the button.
+--
+-- light_ids limits which of that person's LIFX bulbs the app touches. Null or
+-- empty means all of them.
+-- ---------------------------------------------------------------------------
+create table if not exists public.user_settings (
+  user_id        uuid primary key references auth.users(id) on delete cascade,
+  max_brightness real not null default 1 check (max_brightness >= 0 and max_brightness <= 1),
+  light_ids      text[],
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.user_settings enable row level security;
+
+drop policy if exists "settings owned" on public.user_settings;
+create policy "settings owned"
+  on public.user_settings for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+
+-- ---------------------------------------------------------------------------
 -- scenes — shared library. Anyone in the group can create / edit / delete.
 -- ---------------------------------------------------------------------------
 create table if not exists public.scenes (

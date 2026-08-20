@@ -82,6 +82,17 @@ Two things to know:
   repo, so the lights work immediately but nothing plays. To add audio, open an
   effect in the app and attach the file. Names match the originals, so `Fireball`
   wants `fireball.wav`.
+- **Then import the sounds.** The dndlights `sounds` release has all 43 `.wav`
+  files. Once the seed is loaded and `server/.env` is filled in:
+
+  ```bash
+  node scripts/import-sounds.mjs --dry-run   # see what it would do
+  node scripts/import-sounds.mjs             # ~95 MB, a few minutes
+  ```
+
+  It downloads each file, uploads it to the `effect-sounds` bucket, and points
+  the matching effect at it. Re-running skips effects that already have audio.
+
 - **The last block is optional.** It rebuilds the dndlights folder groupings
   (Offensive, Elemental, Creatures, …) for one person. Folders are private per
   user, so change `YOUR_EMAIL_HERE` to your login email before running it, and

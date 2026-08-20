@@ -62,6 +62,7 @@ export const api = {
     durationMs?: number;
     power?: 'on' | 'off';
     fast?: boolean;
+    selector?: string;
   }) =>
     request<{ ok: true; elapsed: number }>('/api/lifx/state', {
       method: 'PUT',
@@ -75,4 +76,7 @@ export const api = {
     request<{ ok: true }>('/api/spotify/play', { method: 'PUT', body: JSON.stringify(body) }),
 
   spotifyPause: () => request<{ ok: true }>('/api/spotify/pause', { method: 'PUT' }),
+  spotifyResume: () => request<{ ok: true }>('/api/spotify/play', { method: 'PUT', body: '{}' }),
+  spotifyNext: () => request<{ ok: true }>('/api/spotify/next', { method: 'POST' }),
+  spotifyPrevious: () => request<{ ok: true }>('/api/spotify/previous', { method: 'POST' }),
 };
