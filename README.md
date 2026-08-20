@@ -111,6 +111,9 @@ npm install
 ```
 
 **1. Supabase** — follow [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) start to finish.
+That includes loading `supabase/seed.sql`, which brings over all 22 scenes and
+43 spells/effects from the dndlights R package with their original colours and
+frame timings (see [Presets](#presets-from-dndlights) below).
 
 **2. Spotify** — at <https://developer.spotify.com/dashboard>, create an app and
 add this exact Redirect URI:
@@ -174,6 +177,45 @@ shared with the group.
 effect libraries are shared — anyone can add or delete — but how you organise
 them into folders is yours alone. Drag from the library drawer at the bottom into
 a folder, drag between folders, or drag back to the drawer to unfile.
+
+---
+
+## Presets from dndlights
+
+`supabase/seed.sql` ports the whole dndlights library — **22 scenes** and **43
+spells and effects** (284 light frames), with their original colours,
+brightnesses, playlists, and timings.
+
+The timing conversion is the interesting part. dndlights ran frames
+*sequentially*: `change_light()` started a transition of `duration` seconds and
+then slept for exactly that long before the next call. This app stores absolute
+keyframes instead, so each frame's `t_ms` is the running total of every duration
+before it, and `fade_ms` is that frame's own transition. Fireball's explosion
+frame, the 4th of 7, lands at 1760 ms — `500 + 400 + 860` — exactly where the R
+package fired it.
+
+Two fixups were needed on the way across:
+
+- **Playlist URIs.** dndlights stored share links with a `?si=…` tracking
+  parameter glued on. Spotify's `context_uri` rejects query parameters, so every
+  URI is stripped back to `spotify:playlist:<id>`.
+- **Names.** Rendered the way the R addin's buttons did, via `toTitleCase` — so
+  "Ray of Frost", not "Ray Of Frost".
+
+**Effects arrive silent.** The `.wav` files were never committed to dndlights
+(`inst/sounds/` holds only a `.gitkeep`), so lights work immediately but nothing
+plays. Open an effect in the app and attach the file to add audio; names match
+the originals, so `Fireball` wants `fireball.wav`.
+
+To regenerate after changing dndlights:
+
+```bash
+python3 scripts/port-from-dndlights.py ~/path/to/dndlights
+```
+
+It validates hex codes, brightness ranges, frame ordering, playlist URI shape,
+and that every folder grouping refers to a real scene or effect — and refuses to
+write anything if a check fails.
 
 ---
 

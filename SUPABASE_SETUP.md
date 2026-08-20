@@ -67,6 +67,35 @@ bypasses every RLS policy on this page to anyone who loads the app.
 
 ---
 
+## 3b. Load the dndlights presets (optional but recommended)
+
+`supabase/seed.sql` carries all 22 scenes and all 43 spells/effects ported from
+the dndlights R package, with their original colours, brightnesses, playlists,
+and frame timings. **SQL Editor** → **New query** → paste the file → **Run**.
+
+Idempotent, like the schema — re-running adds only what's missing and never
+overwrites anything you've since edited.
+
+Two things to know:
+
+- **Effects arrive with no sound.** The `.wav` files were never in the dndlights
+  repo, so the lights work immediately but nothing plays. To add audio, open an
+  effect in the app and attach the file. Names match the originals, so `Fireball`
+  wants `fireball.wav`.
+- **The last block is optional.** It rebuilds the dndlights folder groupings
+  (Offensive, Elemental, Creatures, …) for one person. Folders are private per
+  user, so change `YOUR_EMAIL_HERE` to your login email before running it, and
+  have each friend run that block with their own email if they want the same
+  layout. Everyone can also just drag things into their own folders instead.
+
+To regenerate the file after changing dndlights:
+
+```bash
+python3 scripts/port-from-dndlights.py ~/path/to/dndlights
+```
+
+---
+
 ## 4. Configure auth
 
 Go to **Authentication** → **Sign In / Providers** → **Email**:
