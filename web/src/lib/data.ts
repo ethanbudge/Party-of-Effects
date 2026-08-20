@@ -7,6 +7,7 @@ import type {
   Kind,
   Profile,
   Scene,
+  GroupId,
   UserSettings,
 } from './types';
 
@@ -32,6 +33,7 @@ export async function getSettings(userId: string): Promise<UserSettings> {
       voice_enabled: false,
       voice_language: 'en-US',
       voice_allow_cloud: false,
+      active_group_id: null,
     }
   );
 }
@@ -59,8 +61,16 @@ export function lightSelector(ids: string[] | null | undefined): string {
 // Scenes
 // ---------------------------------------------------------------------------
 
-export async function listScenes(): Promise<Scene[]> {
-  const { data, error } = await supabase.from('scenes').select('*').order('name');
+/**
+ * Scenes for the group being viewed.
+ *
+ * RLS already makes another group's rows unreachable; this filter narrows to
+ * the one group on screen. Solo mode (`null`) asks for rows with no group,
+ * which RLS further restricts to ones you created.
+ */
+export async function listScenes(groupId: GroupId): Promise<Scene[]> {
+  const q = supabase.from('scenes').select('*').order('name');
+  const { data, error } = await (groupId ? q.eq('group_id', groupId) : q.is('group_id', null));
   if (error) throw error;
   return data as Scene[];
 }
@@ -70,6 +80,7 @@ export async function createScene(input: {
   hex: string;
   brightness: number;
   playlist_uri: string | null;
+  group_id: GroupId;
   created_by: string;
 }): Promise<Scene> {
   const { data, error } = await supabase.from('scenes').insert(input).select().single();
@@ -91,8 +102,9 @@ export async function deleteScene(id: string): Promise<void> {
 // Effects
 // ---------------------------------------------------------------------------
 
-export async function listEffects(): Promise<Effect[]> {
-  const { data, error } = await supabase.from('effects').select('*').order('name');
+export async function listEffects(groupId: GroupId): Promise<Effect[]> {
+  const q = supabase.from('effects').select('*').order('name');
+  const { data, error } = await (groupId ? q.eq('group_id', groupId) : q.is('group_id', null));
   if (error) throw error;
   return (data as Effect[]).map((e) => ({
     ...e,
@@ -108,6 +120,7 @@ export async function createEffect(input: {
   frames: Frame[];
   revert_ms: number;
   trigger_words: string[];
+  group_id: GroupId;
   created_by: string;
 }): Promise<Effect> {
   const { data, error } = await supabase.from('effects').insert(input).select().single();
@@ -133,9 +146,21 @@ export async function deleteEffect(effect: Effect): Promise<void> {
 // Sound storage
 // ---------------------------------------------------------------------------
 
-export async function uploadSound(file: File, userId: string): Promise<string> {
+/**
+ * Upload a sound into the right place for who can hear it.
+ *
+ * The storage policies read access rights straight off the path: a group's
+ * uuid prefix means "members of that group", `u_<user>` means "just me". So
+ * the path is chosen here rather than being incidental.
+ */
+export async function uploadSound(
+  file: File,
+  userId: string,
+  groupId: GroupId,
+): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'wav';
-  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+  const prefix = groupId ?? `u_${userId}`;
+  const path = `${prefix}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
     contentType: file.type || 'audio/wav',
@@ -157,12 +182,9 @@ export async function soundUrl(path: string): Promise<string> {
 // Folders (per person)
 // ---------------------------------------------------------------------------
 
-export async function listFolders(kind: Kind): Promise<Folder[]> {
-  const { data, error } = await supabase
-    .from('folders')
-    .select('*')
-    .eq('kind', kind)
-    .order('position');
+export async function listFolders(kind: Kind, groupId: GroupId): Promise<Folder[]> {
+  const q = supabase.from('folders').select('*').eq('kind', kind).order('position');
+  const { data, error } = await (groupId ? q.eq('group_id', groupId) : q.is('group_id', null));
   if (error) throw error;
   return data as Folder[];
 }
@@ -171,6 +193,7 @@ export async function createFolder(input: {
   name: string;
   kind: Kind;
   owner_id: string;
+  group_id: GroupId;
   position: number;
 }): Promise<Folder> {
   const { data, error } = await supabase.from('folders').insert(input).select().single();
@@ -189,11 +212,13 @@ export async function deleteFolder(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function listFolderItems(kind: Kind): Promise<FolderItem[]> {
+export async function listFolderItems(kind: Kind, folderIds: string[]): Promise<FolderItem[]> {
+  if (folderIds.length === 0) return [];
   const { data, error } = await supabase
     .from('folder_items')
     .select('*')
     .eq('kind', kind)
+    .in('folder_id', folderIds)
     .order('position');
   if (error) throw error;
   return data as FolderItem[];

@@ -3,7 +3,7 @@ import { ColorWheel } from '../components/ColorWheel';
 import { applyLight, getLightProfile, setAmbient } from '../lib/sequencer';
 import { normalisePlaylistUri, pause, playContext } from '../lib/spotify';
 import { sceneGradient } from '../lib/color';
-import type { PartyEvent } from '../lib/types';
+import type { GroupId, PartyEvent } from '../lib/types';
 import type { PartyMember } from '../lib/realtime';
 
 /**
@@ -17,10 +17,12 @@ export function GeneralTab({
   send,
   members,
   displayName,
+  groupId,
 }: {
   send: (event: PartyEvent) => void;
   members: PartyMember[];
   displayName: string;
+  groupId: GroupId;
 }) {
   const [hex, setHex] = useState('#CC7820');
   const [brightness, setBrightness] = useState(0.5);
@@ -52,7 +54,9 @@ export function GeneralTab({
     if (scope === 'party') {
       send({ type: 'music', action: 'play', contextUri: uri, by: displayName });
       setNotice(
-        `Sent to ${members.length} connected ${members.length === 1 ? 'player' : 'players'}.`,
+        groupId
+          ? `Sent to ${members.length} connected ${members.length === 1 ? 'player' : 'players'}.`
+          : 'Playing on your own account — you are not in a group.',
       );
     } else {
       playContext(uri).catch((e) => setError((e as Error).message));
@@ -101,7 +105,7 @@ export function GeneralTab({
 
           <div className="row wrap">
             <button className="btn" onClick={() => pushLight('party')}>
-              Apply to everyone
+              {groupId ? 'Apply to everyone' : 'Apply'}
             </button>
             <button className="btn secondary" onClick={() => pushLight('me')}>
               Just me
@@ -163,11 +167,16 @@ export function GeneralTab({
 
           <h3 style={{ marginTop: 24 }}>In the session</h3>
           <p className="hint">
-            Only these people's lights will respond. Nobody offline can be reached — by anyone,
-            including you.
+            {groupId
+              ? "Only these people's lights will respond. Nobody offline can be reached — by anyone, including you."
+              : "You're working solo, so everything here affects only your own lights and Spotify. Join a group to play together."}
           </p>
           <div className="row wrap">
-            {members.length === 0 ? (
+            {!groupId ? (
+              <span className="pill">
+                <span className="dot off" /> Solo
+              </span>
+            ) : members.length === 0 ? (
               <span className="meta">Connecting…</span>
             ) : (
               members.map((m) => (

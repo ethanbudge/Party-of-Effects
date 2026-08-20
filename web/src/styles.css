@@ -1249,3 +1249,122 @@ input[type='color'] {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ==========================================================================
+   Groups
+   ========================================================================== */
+
+.group-switcher {
+  position: relative;
+}
+
+.group-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 570;
+  font-size: 13px;
+  max-width: 260px;
+}
+
+.group-button:hover {
+  border-color: var(--text-faint);
+}
+
+.group-button-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-button-count {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.group-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 300px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  z-index: 60;
+}
+
+.group-menu-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  padding: 6px 9px 8px;
+}
+
+.group-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 9px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.group-option:hover {
+  background: var(--surface-2);
+}
+
+.group-option.active {
+  background: color-mix(in srgb, var(--calm) 34%, transparent);
+}
+
+.group-option .dot {
+  margin-top: 5px;
+}
+
+.group-check {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.group-menu-foot {
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  padding: 8px 3px 3px;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.group-row:last-child {
+  border-bottom: none;
+}
+
+.group-row-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}

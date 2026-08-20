@@ -1,11 +1,32 @@
 export type Kind = 'scene' | 'effect';
 
+export interface Group {
+  id: string;
+  name: string;
+  role: 'owner' | 'member';
+  isOwner: boolean;
+}
+
+export interface GroupMember {
+  userId: string;
+  role: 'owner' | 'member';
+  displayName: string;
+}
+
+/**
+ * Which library you are looking at. `null` is solo mode: a private library
+ * only you can see, and no live channel at all.
+ */
+export type GroupId = string | null;
+
 export interface Scene {
   id: string;
   name: string;
   hex: string;
   brightness: number;
   playlist_uri: string | null;
+  /** Null means private to created_by; set means shared with that group. */
+  group_id: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -29,6 +50,8 @@ export interface Effect {
   revert_ms: number;
   /** Spoken phrases that fire this effect. Shared with the group. */
   trigger_words: string[];
+  /** Null means private to created_by; set means shared with that group. */
+  group_id: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -38,6 +61,8 @@ export interface Folder {
   owner_id: string;
   name: string;
   kind: Kind;
+  /** Folders are private per person AND per group. */
+  group_id: string | null;
   position: number;
 }
 
@@ -67,6 +92,8 @@ export interface UserSettings {
   voice_language: string;
   /** Permit cloud recognition when no on-device model is available. */
   voice_allow_cloud: boolean;
+  /** The group currently being viewed. Null = solo. */
+  active_group_id: string | null;
 }
 
 export type MusicAction = 'play' | 'pause' | 'resume' | 'next' | 'previous';

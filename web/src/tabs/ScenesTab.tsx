@@ -5,22 +5,24 @@ import { SceneEditor, type SceneDraft } from '../components/SceneEditor';
 import { useFolders } from '../lib/useFolders';
 import { sceneGradient } from '../lib/color';
 import * as db from '../lib/data';
-import type { PartyEvent, Scene } from '../lib/types';
+import type { GroupId, PartyEvent, Scene } from '../lib/types';
 
 export function ScenesTab({
   scenes,
   reloadScenes,
   userId,
+  groupId,
   displayName,
   send,
 }: {
   scenes: Scene[];
   reloadScenes: () => Promise<void>;
   userId: string;
+  groupId: GroupId;
   displayName: string;
   send: (event: PartyEvent) => void;
 }) {
-  const folders = useFolders('scene', userId);
+  const folders = useFolders('scene', userId, groupId);
   const [editing, setEditing] = useState<Scene | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -33,7 +35,7 @@ export function ScenesTab({
 
   async function save(draft: SceneDraft) {
     if (editing) await db.updateScene(editing.id, draft);
-    else await db.createScene({ ...draft, created_by: userId });
+    else await db.createScene({ ...draft, group_id: groupId, created_by: userId });
     await reloadScenes();
   }
 

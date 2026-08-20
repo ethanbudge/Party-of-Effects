@@ -124,3 +124,65 @@ export async function verifyState(state: string, keyBase64: string): Promise<str
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Group password hashing
+// ---------------------------------------------------------------------------
+// PBKDF2-HMAC-SHA256 at OWASP's recommended work factor. Web Crypto has no
+// bcrypt/argon2 and Cloudflare Workers has no native module for them, so
+// PBKDF2 is the portable choice — and it is the one OWASP names for
+// FIPS-constrained environments at this iteration count.
+//
+// Note for deployment: 600k iterations costs a few hundred milliseconds of
+// CPU. That is fine here because it runs only when someone creates or joins a
+// group, but it will exceed Cloudflare's free-tier 10ms CPU cap. On Workers,
+// raise the CPU limit (paid plan) before relying on group joins.
+
+const PBKDF2_ITERATIONS = 600_000;
+
+export async function hashGroupPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(16)));
+  const bits = await deriveBits(password, salt, PBKDF2_ITERATIONS);
+  return `pbkdf2-sha256$${PBKDF2_ITERATIONS}$${b64encode(salt)}$${b64encode(bits)}`;
+}
+
+export async function verifyGroupPassword(password: string, stored: string): Promise<boolean> {
+  const [scheme, iterStr, saltB64, hashB64] = stored.split('$');
+  if (scheme !== 'pbkdf2-sha256' || !iterStr || !saltB64 || !hashB64) return false;
+
+  const iterations = Number(iterStr);
+  if (!Number.isFinite(iterations) || iterations < 1000) return false;
+
+  const derived = await deriveBits(password, b64decode(saltB64), iterations);
+  return timingSafeEqual(b64encode(derived), hashB64);
+}
+
+async function deriveBits(
+  password: string,
+  // Uint8Array<ArrayBuffer>, not the looser ArrayBufferLike: TS 5.7 only
+  // accepts the former as a Web Crypto BufferSource.
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    key,
+    256,
+  );
+  return new Uint8Array(bits);
+}
+
+/** Constant-time comparison, so a wrong password can't be narrowed by timing. */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}

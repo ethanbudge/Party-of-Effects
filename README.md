@@ -42,6 +42,48 @@ there is nothing listening, and nothing on the server will act on your behalf.
 
 ---
 
+## Groups
+
+A group is a shared library plus a live session. You join one with its **name
+and password**, both of which have to be right.
+
+- **Each group has its own scenes and effects.** Switching group in the top bar
+  switches the whole library. Your folders stay private to you, per group.
+- **You don't need a group.** Solo mode gives you a private library nobody else
+  can see, and opens no live channel at all — there is nothing to broadcast to
+  and nothing that can reach you.
+- **The creator owns the group** and is the only one who can delete it or change
+  its password. Deleting removes its scenes, effects, uploaded sounds and
+  memberships for everyone. Members can leave whenever they like.
+- **You can be in several groups** and switch between them freely.
+
+How the password is handled:
+
+- **It is never stored.** Only a PBKDF2-HMAC-SHA256 hash at 600,000 iterations,
+  OWASP's current recommendation, with a random salt per group.
+- **It is never sent to a browser and never checked in one.** Hashes live in
+  `group_secrets`, a table with RLS enabled and zero policies — unreachable by
+  the anon key even for a group you own. Only the API's service-role key can
+  read it, and it compares in constant time.
+- **Wrong name and wrong password give the same answer**, after the same amount
+  of work, so the endpoint can't be used to discover which groups exist.
+- **Failed joins are throttled** — eight per fifteen minutes — because group
+  names are guessable.
+- **You cannot browse groups you aren't in.** There is deliberately no policy
+  allowing it.
+
+Isolation is enforced in the database, not the UI. Every table, the storage
+bucket, and the realtime channel all gate on one SECURITY DEFINER function,
+`is_group_member()`. It has to be SECURITY DEFINER: a policy on `group_members`
+that itself reads `group_members` recurses infinitely and Postgres aborts the
+query.
+
+The live channel is per group (`group:<uuid>`), and its RLS policy parses the id
+back out of the topic and checks membership — so someone outside the group
+cannot subscribe to hear what it is doing, let alone send to it.
+
+---
+
 ## Security model
 
 | Secret | Where it lives | Who can read it |

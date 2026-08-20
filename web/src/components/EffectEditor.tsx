@@ -135,6 +135,7 @@ export function EffectEditor({
         frames: sorted.map(strip),
         revert_ms: revertMs,
         trigger_words: [],
+        group_id: null,
         created_by: null,
         created_at: '',
       },

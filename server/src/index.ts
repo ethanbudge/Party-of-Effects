@@ -4,6 +4,7 @@ import type { Env } from './env.js';
 import { credentialRoutes } from './routes/credentials.js';
 import { lifxRoutes } from './routes/lifx.js';
 import { spotifyRoutes } from './routes/spotify.js';
+import { groupRoutes } from './routes/groups.js';
 
 /**
  * The API.
@@ -36,6 +37,7 @@ export function createApp() {
   app.route('/api/credentials', credentialRoutes);
   app.route('/api/lifx', lifxRoutes);
   app.route('/api/spotify', spotifyRoutes);
+  app.route('/api/groups', groupRoutes);
 
   app.onError((err, c) => {
     console.error('[api error]', err);

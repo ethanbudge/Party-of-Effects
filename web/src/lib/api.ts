@@ -38,7 +38,48 @@ export interface LifxLight {
   power: string;
 }
 
+export interface ApiGroup {
+  id: string;
+  name: string;
+  role: 'owner' | 'member';
+  isOwner: boolean;
+}
+
 export const api = {
+  // ---- groups ----
+  // All group operations run server-side: the password must be verified where
+  // the hash lives, and a group is only coherent if its row, its secret and
+  // its owner membership are written together.
+  listGroups: () => request<{ groups: ApiGroup[] }>('/api/groups'),
+
+  createGroup: (name: string, password: string) =>
+    request<{ group: ApiGroup }>('/api/groups', {
+      method: 'POST',
+      body: JSON.stringify({ name, password }),
+    }),
+
+  joinGroup: (name: string, password: string) =>
+    request<{ group: ApiGroup }>('/api/groups/join', {
+      method: 'POST',
+      body: JSON.stringify({ name, password }),
+    }),
+
+  leaveGroup: (id: string) =>
+    request<{ ok: true }>(`/api/groups/${id}/leave`, { method: 'POST' }),
+
+  deleteGroup: (id: string) => request<{ ok: true }>(`/api/groups/${id}`, { method: 'DELETE' }),
+
+  setGroupPassword: (id: string, password: string) =>
+    request<{ ok: true }>(`/api/groups/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
+    }),
+
+  groupMembers: (id: string) =>
+    request<{ members: { userId: string; role: 'owner' | 'member'; displayName: string }[] }>(
+      `/api/groups/${id}/members`,
+    ),
+
   status: () => request<{ lifx: boolean; spotify: boolean }>('/api/credentials/status'),
 
   connectLifx: (token: string) =>

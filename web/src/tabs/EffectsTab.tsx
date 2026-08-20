@@ -6,22 +6,24 @@ import { useFolders } from '../lib/useFolders';
 import { framesToGradient } from '../lib/color';
 import * as db from '../lib/data';
 import { evictSound } from '../lib/sequencer';
-import type { Effect, PartyEvent } from '../lib/types';
+import type { Effect, GroupId, PartyEvent } from '../lib/types';
 
 export function EffectsTab({
   effects,
   reloadEffects,
   userId,
+  groupId,
   displayName,
   send,
 }: {
   effects: Effect[];
   reloadEffects: () => Promise<void>;
   userId: string;
+  groupId: GroupId;
   displayName: string;
   send: (event: PartyEvent) => void;
 }) {
-  const folders = useFolders('effect', userId);
+  const folders = useFolders('effect', userId, groupId);
   const [editing, setEditing] = useState<Effect | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -42,7 +44,7 @@ export function EffectsTab({
     let soundPath = editing?.sound_path ?? null;
 
     if (draft.file) {
-      soundPath = await db.uploadSound(draft.file, userId);
+      soundPath = await db.uploadSound(draft.file, userId, groupId);
       // Drop the stale decoded buffer so the next trigger fetches the new one.
       if (editing) evictSound(editing.id);
     }
@@ -64,6 +66,7 @@ export function EffectsTab({
         duration_ms: draft.duration_ms,
         trigger_words: draft.trigger_words,
         sound_path: soundPath,
+        group_id: groupId,
         created_by: userId,
       });
     }

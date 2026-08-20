@@ -2,7 +2,12 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { PartyEvent } from './types';
 
-const CHANNEL_NAME = 'party-main';
+/**
+ * Channel name per group. The database policy on realtime.messages parses the
+ * uuid back out of this topic and checks membership, so the channel name is
+ * load-bearing — it must stay exactly `group:<uuid>`.
+ */
+const topicFor = (groupId: string) => `group:${groupId}`;
 
 export interface PartyMember {
   userId: string;
@@ -23,13 +28,14 @@ export interface PartyMember {
  * subscribe to listen in.
  */
 export function joinParty(opts: {
+  groupId: string;
   userId: string;
   displayName: string;
   onEvent: (event: PartyEvent) => void;
   onMembers: (members: PartyMember[]) => void;
   onStatus?: (status: string) => void;
 }): { channel: RealtimeChannel; send: (event: PartyEvent) => void; leave: () => void } {
-  const channel = supabase.channel(CHANNEL_NAME, {
+  const channel = supabase.channel(topicFor(opts.groupId), {
     config: {
       private: true,
       // self:true means the person who pressed the button also receives the

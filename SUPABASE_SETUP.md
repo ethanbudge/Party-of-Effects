@@ -40,6 +40,28 @@ upgraded in place without losing data.
 
 ---
 
+## 2b. Run the groups migration
+
+Same again with `supabase/groups.sql`: **SQL Editor** → **New query** → paste →
+**Run**. It adds groups, memberships, password storage, and rewrites the
+security policies so scenes and effects belong to a group instead of being
+visible to everyone.
+
+Also safe to re-run.
+
+**Moving your existing library into a group.** Before groups existed, all
+scenes and effects were shared with every account. They now need an owner:
+
+1. Start the app, open the group menu in the top bar, and **create your group**.
+2. Come back to the SQL Editor, scroll to the very bottom of `groups.sql`,
+   change `YOUR_GROUP_NAME_HERE` to the name you just used, and run that last
+   `do $$ ... $$;` block on its own.
+
+It reports how many rows it adopted. Until you do this the presets belong to
+nobody and won't appear in any library.
+
+---
+
 ## 3. Collect your keys
 
 Go to **Project Settings** → **API** (newer dashboards split this into
@@ -157,12 +179,13 @@ short-lived signed URLs, not public links.
 
 Go to **Realtime** → **Settings** and turn **"Allow public access"** OFF.
 
-Don't skip this one. The policies in `schema.sql` restrict the broadcast channel
-to authenticated users, but they are only *consulted* when public access is
+Don't skip this one. The policies in `groups.sql` restrict each group's channel
+to that group's members, but they are only *consulted* when public access is
 disabled. Leave it on and the app's `private: true` channel setting is ignored —
 anyone who loads the page can pull the public anon key out of the JavaScript
-bundle, connect to the channel without logging in, and fire effects at whoever
-is currently online. With it off, joining the channel requires a real login.
+bundle, connect to any group's channel without being in it, and fire effects at
+whoever is online. With it off, joining a channel requires both a real login and
+a real membership.
 
 ---
 
@@ -189,7 +212,7 @@ group by tablename
 order by tablename;
 ```
 
-`user_credentials` should **not appear in this list at all**. That's correct and
+`user_credentials` and `group_secrets` should **not appear in this list at all**. That's correct and
 intentional: RLS enabled with zero policies means Postgres denies every read and
 write from the browser's anon key. Only the server's `service_role` key can reach
 that table, and it only ever does so on behalf of the user whose own login token
